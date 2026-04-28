@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Resolve Remote</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Barlow+Condensed:wght@300;600;800&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .remote-shell {
+    background: #0a0a0c;
+    min-height: 100vh;
+    padding: 0;
+    font-family: 'Barlow Condensed', sans-serif;
+    color: #e8e4d8;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .header {
+    padding: 14px 16px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #1e1e24;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo-group { display: flex; flex-direction: column; }
+
+  .logo-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 19px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #e8e4d8;
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #c75d2c;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .settings-btn {
+    background: #111117;
+    border: 1px solid #222230;
+    border-radius: 6px;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+    transition: border-color 0.2s, color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .settings-btn:active { border-color: #c75d2c; color: #c75d2c; }
+
+  .status-dot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #444;
+    box-shadow: none;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+
+  .dot.connected {
+    background: #2a7a3a;
+    box-shadow: 0 0 6px #2a7a3a;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  .dot.error {
+    background: #8b2a2a;
+    box-shadow: 0 0 6px #8b2a2a;
+  }
+
+  .dot.checking {
+    background: #8b7a2a;
+    box-shadow: 0 0 6px #8b7a2a;
+    animation: pulse-dot 0.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Settings Panel ── */
+  .settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    display: none;
+    align-items: flex-end;
+  }
+
+  .settings-overlay.open { display: flex; }
+
+  .settings-panel {
+    background: #0e0e14;
+    border: 1px solid #2a2a38;
+    border-radius: 16px 16px 0 0;
+    padding: 20px 20px 36px;
+    width: 100%;
+    animation: slideUp 0.22s ease-out;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  .settings-handle {
+    width: 36px;
+    height: 4px;
+    background: #333;
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+
+  .settings-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #e8e4d8;
+    margin-bottom: 16px;
+  }
+
+  .settings-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #555;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .settings-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .settings-input {
+    flex: 1;
+    background: #111117;
+    border: 1px solid #222230;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #e8e4d8;
+    outline: none;
+    letter-spacing: 0.05em;
+  }
+
+  .settings-input:focus { border-color: #c75d2c; }
+
+  .settings-input::placeholder { color: #333; }
+
+  .connect-btn {
+    background: #c75d2c;
+    border: none;
+    border-radius: 8px;
+    padding: 0 18px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .connect-btn:active { background: #a04520; }
+
+  .status-message {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    display: none;
+  }
+
+  .status-message.ok   { background: #0d1f12; color: #2a7a3a; border: 1px solid #1a4a22; display: block; }
+  .status-message.err  { background: #1f0d0d; color: #8b2a2a; border: 1px solid #4a1a1a; display: block; }
+  .status-message.info { background: #111120; color: #555; border: 1px solid #222236; display: block; }
+
+  .howto {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #333;
+    letter-spacing: 0.04em;
+    line-height: 1.7;
+    border-top: 1px solid #1a1a22;
+    padding-top: 14px;
+  }
+
+  .howto b { color: #555; }
+
+  /* ── Timecode & main UI ── */
+  .timecode-bar {
+    background: #0e0e12;
+    padding: 10px 20px;
+    border-bottom: 1px solid #1e1e24;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+  }
+
+  .timecode {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: #e8e4d8;
+    letter-spacing: 0.06em;
+  }
+
+  .timecode span { color: #c75d2c; }
+
+  .last-action {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #3a3a45;
+    letter-spacing: 0.05em;
+    transition: color 0.3s;
+  }
+
+  .last-action.active { color: #c75d2c; }
+
+  .btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 14px 14px 0;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .btn-row-3 {
+    display: flex;
+    gap: 10px;
+    padding: 10px 14px 14px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .btn-row-3 .remote-btn { flex: 1; }
+
+  .remote-btn {
+    position: relative;
+    background: #111117;
+    border: 1px solid #222230;
+    border-radius: 10px;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 96px;
+    gap: 0;
+    transition: transform 0.1s, background 0.12s, border-color 0.12s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  .remote-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .remote-btn.play::before   { background: radial-gradient(ellipse at 50% 110%, #1a5c2a55, transparent 70%); }
+  .remote-btn.cut::before    { background: radial-gradient(ellipse at 50% 110%, #6b1a1a55, transparent 70%); }
+  .remote-btn.undo::before   { background: radial-gradient(ellipse at 50% 110%, #1a2e5c55, transparent 70%); }
+  .remote-btn.redo::before   { background: radial-gradient(ellipse at 50% 110%, #2e1a5c55, transparent 70%); }
+  .remote-btn.back-btn::before { background: radial-gradient(ellipse at 50% 110%, #5c3a1a55, transparent 70%); }
+  .remote-btn.fwd-btn::before  { background: radial-gradient(ellipse at 50% 110%, #1a4a5c55, transparent 70%); }
+
+  .remote-btn:active {
+    transform: scale(0.93);
+    border-color: #444;
+  }
+
+  .remote-btn:active::before { opacity: 1; }
+
+  .remote-btn.play:active    { background: #0d1f12; border-color: #2a7a3a; }
+  .remote-btn.cut:active     { background: #1f0d0d; border-color: #8b2a2a; }
+  .remote-btn.undo:active    { background: #0d121f; border-color: #2a4a8b; }
+  .remote-btn.redo:active    { background: #150d1f; border-color: #6a2a8b; }
+  .remote-btn.back-btn:active { background: #1f160d; border-color: #8b6a2a; }
+  .remote-btn.fwd-btn:active  { background: #0d181f; border-color: #2a6a8b; }
+
+  .btn-icon {
+    font-size: 28px;
+    line-height: 1;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .btn-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #888;
+    line-height: 1;
+  }
+
+  .btn-shortcut {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #333;
+    letter-spacing: 0.06em;
+    margin-top: 4px;
+    display: block;
+  }
+
+  .remote-btn.play .btn-label   { color: #2a7a3a; }
+  .remote-btn.cut .btn-label    { color: #8b2a2a; }
+  .remote-btn.undo .btn-label   { color: #2a4a8b; }
+  .remote-btn.redo .btn-label   { color: #6a2a8b; }
+  .remote-btn.back-btn .btn-label { color: #8b6a2a; }
+  .remote-btn.fwd-btn .btn-label  { color: #2a6a8b; }
+
+  .flash-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.08s;
+  }
+
+  .remote-btn.play .flash-ring    { border-color: #2a7a3a; }
+  .remote-btn.cut .flash-ring     { border-color: #8b2a2a; }
+  .remote-btn.undo .flash-ring    { border-color: #2a4a8b; }
+  .remote-btn.redo .flash-ring    { border-color: #6a2a8b; }
+  .remote-btn.back-btn .flash-ring { border-color: #8b6a2a; }
+  .remote-btn.fwd-btn .flash-ring  { border-color: #2a6a8b; }
+
+  .remote-btn:active .flash-ring { opacity: 1; }
+
+  .play-state {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #2a7a3a;
+    letter-spacing: 0.1em;
+  }
+
+  .footer {
+    padding: 10px 16px 18px;
+    border-top: 1px solid #1a1a22;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+  }
+
+  .footer-tip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #2a2a35;
+    letter-spacing: 0.04em;
+  }
+
+  .footer-brand {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #1e1e28;
+  }
+
+  .action-log {
+    padding: 6px 16px 4px;
+    position: relative;
+    z-index: 1;
+    min-height: 24px;
+  }
+
+  .log-entry {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #2e2e3e;
+    letter-spacing: 0.04em;
+    transition: color 0.4s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .log-entry.lit { color: #555570; }
+
+  /* offline badge on buttons */
+  .offline-badge {
+    position: absolute;
+    top: 6px; left: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: #8b2a2a;
+    letter-spacing: 0.06em;
+    display: none;
+  }
+
+  .is-offline .offline-badge { display: block; }
+</style>
+</head>
+<body>
+<div class="remote-shell" id="shell">
+  <div class="scanlines"></div>
+
+  <!-- Settings Overlay -->
+  <div class="settings-overlay" id="settings-overlay" onclick="closeSettingsOnBackdrop(event)">
+    <div class="settings-panel">
+      <div class="settings-handle"></div>
+      <div class="settings-title">Server Connection</div>
+
+      <div class="settings-label">Your PC's local IP address &amp; port</div>
+      <div class="settings-row">
+        <input class="settings-input" id="server-ip" type="text"
+               placeholder="192.168.1.XX" inputmode="decimal" autocomplete="off" spellcheck="false">
+        <input class="settings-input" id="server-port" type="text"
+               value="5050" style="width:80px;flex:none" inputmode="numeric">
+        <button class="connect-btn" onclick="testConnection()">TEST</button>
+      </div>
+
+      <div class="status-message" id="conn-status"></div>
+
+      <div class="howto">
+        <b>How to set up:</b><br>
+        1. On your editing PC, run <b>resolve_server.py</b><br>
+        2. Find PC's local IP:<br>
+        &nbsp;&nbsp;• Windows → <b>ipconfig</b> in CMD<br>
+        &nbsp;&nbsp;• Mac/Linux → <b>ifconfig</b> in Terminal<br>
+        3. Make sure phone &amp; PC are on the <b>same Wi-Fi</b><br>
+        4. Enter IP above and tap TEST<br>
+        5. Keep DaVinci Resolve focused on your PC
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-group">
+      <div class="logo-title">Resolve Remote</div>
+      <div class="logo-sub">DaVinci · Edit Control</div>
+    </div>
+    <div class="header-right">
+      <div class="status-dot" onclick="openSettings()">
+        <div class="dot" id="conn-dot"></div>
+        <span id="conn-label">OFFLINE</span>
+      </div>
+      <div class="settings-btn" onclick="openSettings()">⚙</div>
+    </div>
+  </div>
+
+  <!-- Timecode -->
+  <div class="timecode-bar">
+    <div class="timecode" id="timecode">00<span>:</span>00<span>:</span>00<span>:</span>00</div>
+    <div class="last-action" id="last-action">NO ACTION</div>
+  </div>
+
+  <!-- Action log -->
+  <div class="action-log">
+    <div class="log-entry" id="log-entry">&gt; tap ⚙ to connect to your PC</div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="btn-grid">
+    <button class="remote-btn play" data-action="PLAY / PAUSE" data-key="Space" onclick="triggerBtn(this)">
+      <div class="flash-ring"></div>
+      <div class="offline-badge">LOCAL</div>
+      <span class="play-state" id="play-indicator">PAUSED</span>
+      <span class="btn-icon" id="play-icon">▶</span>
+      <span class="btn-label">Play / Pause</span>
+      <span class="btn-shortcut">SPACE</span>
+    </button>
+
+    <button class="remote-btn cut" data-action="CUT" data-key="Ctrl+B" onclick="triggerBtn(this)">
+      <div class="flash-ring"></div>
+      <div class="offline-badge">LOCAL</div>
+      <span class="btn-icon">✂</span>
+      <span class="btn-label">Cut</span>
+      <span class="btn-shortcut">CTRL+B</span>
+    </button>
+
+    <button class="remote-btn undo" data-action="UNDO" data-key="Ctrl+Z" onclick="triggerBtn(this)">
+      <div class="flash-ring"></div>
+      <div class="offline-badge">LOCAL</div>
+      <span class="btn-icon">↩</span>
+      <span class="btn-label">Undo</span>
+      <span class="btn-shortcut">CTRL+Z</span>
+    </button>
+
+    <button class="remote-btn redo" data-action="REDO" data-key="Ctrl+Shift+Z" onclick="triggerBtn(this)">
+      <div class="flash-ring"></div>
+      <div class="offline-badge">LOCAL</div>
+      <span class="btn-icon">↪</span>
+      <span class="btn-label">Redo</span>
+      <span class="btn-shortcut">CTRL+⇧+Z</span>
+    </button>
+  </div>
+
+  <div class="btn-row-3">
+    <button class="remote-btn back-btn" data-action="STEP BACK" data-key="←" onclick="triggerBtn(this)">
+      <div class="flash-ring"></div>
+      <div class="offline-badge">LOCAL</div>
+      <span class="btn-icon">⏮</span>
+      <span class="btn-label">Back</span>
+      <span class="btn-shortcut">← ARROW</span>
+    </button>
+
+    <button class="remote-btn fwd-btn" data-action="STEP FORWARD" data-key="→" onclick="triggerBtn(this)">
+      <div class="flash-ring"></div>
+      <div class="offline-badge">LOCAL</div>
+      <span class="btn-icon">⏭</span>
+      <span class="btn-label">Forward</span>
+      <span class="btn-shortcut">→ ARROW</span>
+    </button>
+  </div>
+
+  <div class="footer">
+    <div class="footer-tip" id="footer-tip">tap ⚙ to connect · local log only</div>
+    <div class="footer-brand">v2.0</div>
+  </div>
+</div>
+
+<script>
+  // ── State ──
+  let isPlaying = false;
+  let startTime = Date.now();
+  let serverUrl = localStorage.getItem('resolveServerUrl') || '';
+  let isConnected = false;
+
+  // ── Settings persistence ──
+  if (serverUrl) {
+    try {
+      const u = new URL(serverUrl);
+      document.getElementById('server-ip').value = u.hostname;
+      document.getElementById('server-port').value = u.port || '5050';
+    } catch(e) {}
+    autoCheckConnection();
+  }
+
+  function buildUrl() {
+    const ip   = document.getElementById('server-ip').value.trim();
+    const port = document.getElementById('server-port').value.trim() || '5050';
+    return `http://${ip}:${port}`;
+  }
+
+  // ── Settings panel ──
+  function openSettings() {
+    document.getElementById('settings-overlay').classList.add('open');
+  }
+
+  function closeSettings() {
+    document.getElementById('settings-overlay').classList.remove('open');
+  }
+
+  function closeSettingsOnBackdrop(e) {
+    if (e.target === document.getElementById('settings-overlay')) closeSettings();
+  }
+
+  // ── Connection ──
+  function setConnected(val) {
+    isConnected = val;
+    const dot   = document.getElementById('conn-dot');
+    const label = document.getElementById('conn-label');
+    const tip   = document.getElementById('footer-tip');
+    const shell = document.getElementById('shell');
+
+    if (val) {
+      dot.className = 'dot connected';
+      label.textContent = 'CONNECTED';
+      tip.textContent = 'sending shortcuts → resolve';
+      shell.classList.remove('is-offline');
+    } else {
+      dot.className = 'dot error';
+      label.textContent = 'OFFLINE';
+      tip.textContent = 'tap ⚙ to connect · local log only';
+      shell.classList.add('is-offline');
+    }
+  }
+
+  async function testConnection() {
+    const url = buildUrl();
+    const msg = document.getElementById('conn-status');
+    const dot = document.getElementById('conn-dot');
+
+    msg.className = 'status-message info';
+    msg.textContent = '⟳ connecting to ' + url + '...';
+    dot.className = 'dot checking';
+
+    try {
+      const res = await fetch(url + '/ping', { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        serverUrl = url;
+        localStorage.setItem('resolveServerUrl', url);
+        setConnected(true);
+        msg.className = 'status-message ok';
+        msg.textContent = '✓ connected — server is running at ' + url;
+        setTimeout(closeSettings, 1400);
+      } else {
+        throw new Error('bad status ' + res.status);
+      }
+    } catch(e) {
+      setConnected(false);
+      msg.className = 'status-message err';
+      msg.textContent = '✗ cannot reach server. Check IP, port, and same Wi-Fi.';
+    }
+  }
+
+  async function autoCheckConnection() {
+    const dot = document.getElementById('conn-dot');
+    dot.className = 'dot checking';
+    try {
+      const res = await fetch(serverUrl + '/ping', { signal: AbortSignal.timeout(3000) });
+      setConnected(res.ok);
+    } catch(e) {
+      setConnected(false);
+    }
+  }
+
+  // ── Timecode ──
+  function pad(n, d=2) { return String(n).padStart(d,'0'); }
+
+  function updateTimecode() {
+    if (!isPlaying) return;
+    let elapsed = Math.floor((Date.now() - startTime) / 1000);
+    let fr = Math.floor((Date.now() % 1000) / 41.7);
+    let s = elapsed % 60;
+    let m = Math.floor(elapsed/60) % 60;
+    let h = Math.floor(elapsed/3600);
+    document.getElementById('timecode').innerHTML =
+      pad(h)+'<span>:</span>'+pad(m)+'<span>:</span>'+pad(s)+'<span>:</span>'+pad(fr,2);
+  }
+
+  setInterval(updateTimecode, 42);
+
+  // ── Button trigger ──
+  async function triggerBtn(btn) {
+    const action = btn.dataset.action;
+    const key    = btn.dataset.key;
+
+    // Play state toggle (local UI)
+    if (action === 'PLAY / PAUSE') {
+      isPlaying = !isPlaying;
+      document.getElementById('play-icon').textContent = isPlaying ? '⏸' : '▶';
+      document.getElementById('play-indicator').textContent = isPlaying ? 'PLAYING' : 'PAUSED';
+      if (isPlaying) startTime = Date.now();
+    }
+
+    // Update UI feedback
+    const la = document.getElementById('last-action');
+    la.textContent = action;
+    la.classList.add('active');
+    setTimeout(() => la.classList.remove('active'), 800);
+
+    const log = document.getElementById('log-entry');
+    const ts  = new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+    if (navigator.vibrate) navigator.vibrate(action === 'CUT' ? [30,10,20] : [20]);
+
+    // Send to server if connected
+    if (isConnected && serverUrl) {
+      try {
+        const res = await fetch(serverUrl + '/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+          signal: AbortSignal.timeout(2000)
+        });
+
+        if (res.ok) {
+          log.textContent = '> [' + ts + '] ✓ ' + action + ' → resolve';
+          log.classList.add('lit');
+          setTimeout(() => log.classList.remove('lit'), 1200);
+        } else {
+          throw new Error('Server error');
+        }
+      } catch(e) {
+        setConnected(false);
+        log.textContent = '> [' + ts + '] ✗ lost connection — reconnect in ⚙';
+        log.classList.add('lit');
+        setTimeout(() => log.classList.remove('lit'), 2000);
+      }
+    } else {
+      log.textContent = '> [' + ts + '] ' + action + ' · ' + key + ' (local only)';
+      log.classList.add('lit');
+      setTimeout(() => log.classList.remove('lit'), 1200);
+    }
+  }
+</script>
+</body>
+</html>
